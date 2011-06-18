@@ -72,9 +72,9 @@ namespace ToDoTests
         [Test]
         public void Create_Completed()
         {
-            var task = new Task("X (A) @work +test This is a test task");
+            var task = new Task("X @work +test This is a test task");
 
-            var expectedTask = new Task("(A)", _projects, _contexts, "This is a test task", "", true);
+            var expectedTask = new Task("", _projects, _contexts, "This is a test task", "", true);
             AssertEquivalence(expectedTask, task);
         }
 
@@ -108,7 +108,7 @@ namespace ToDoTests
         [Test]
         public void Create_DueDate()
         {
-            var task = new Task("(A) 2011-05-08 @work @home +test This is a test task");
+            var task = new Task("(A) due:2011-05-08 @work @home +test This is a test task");
 
             var expectedTask = new Task("(A)", _projects, new List<string>() { "@work", "@home" }, "This is a test task","2011-05-08", false);
             AssertEquivalence(expectedTask, task);

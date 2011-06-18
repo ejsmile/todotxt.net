@@ -44,11 +44,11 @@ namespace Client
         Task _updating;
         int _intelliPos;
         DispatcherTimer _dispatcherTimer;
- 
+
         public MainWindow()
         {
             InitializeComponent();
-            
+
             webBrowser1.Navigate("about:blank");
 
             this.Height = User.Default.WindowHeight;
@@ -57,7 +57,7 @@ namespace Client
             this.Top = User.Default.WindowTop;
 
             if (!string.IsNullOrEmpty(User.Default.FilePath))
-                LoadTasks(User.Default.FilePath);
+                LoadTasks(User.Default.FilePath);           
 
             FilterAndSort((SortType)User.Default.CurrentSort);
 
@@ -66,7 +66,7 @@ namespace Client
             ThreadPool.QueueUserWorkItem(x => CheckForUpdates());
         }
 
-        
+
         #region private methods
         private void KeyboardShortcut(Key key)
         {
@@ -95,7 +95,7 @@ namespace Client
                     Help(null, null);
                     break;
                 case Key.F:
-                    Filter(null, null);
+                    Filter_Menu(null, null);
                     break;
                 case Key.OemPeriod:
                     _taskList.ReloadTasks();
@@ -182,17 +182,15 @@ namespace Client
             }
         }
 
-        void SetSort(SortType sort, IEnumerable<Task> tasks = null, Task task = null)
+        void SetSort(SortType sort)
         {
-            if (tasks == null && _taskList == null)
+            if (_taskList == null)
                 return;
 
             IEnumerable<Task> t = null;
             if (_taskList != null)
                 t = _taskList.Tasks;
 
-            if (tasks != null)
-                t = tasks;
 
             User.Default.CurrentSort = (int)sort;
             User.Default.Save();
@@ -201,10 +199,7 @@ namespace Client
 
             lbTasks.ItemsSource = Sort(t, _currentSort);
 
-            if (task == null)
-                lbTasks.SelectedIndex = 0;
-            else
-                lbTasks.SelectedItem = task;
+            lbTasks.SelectedIndex = 0;
 
             lbTasks.Focus();
         }
@@ -239,7 +234,7 @@ namespace Client
         private void Help(object sender, RoutedEventArgs e)
         {
             var version = Assembly.GetExecutingAssembly().GetName().Version.ToString();
-            var msg = 
+            var msg =
 @"todotxt.net: a Windows UI for todo.txt
 
 Version " + version + @"
@@ -264,7 +259,7 @@ Copyright 2011 Ben Hughes";
             MessageBox.Show(msg);
         }
 
-        private void Filter(object sender, RoutedEventArgs e)
+        private void Filter_Menu(object sender, RoutedEventArgs e)
         {
             var f = new FilterDialog();
             f.Left = this.Left + 10;
@@ -279,42 +274,30 @@ Copyright 2011 Ben Hughes";
 
         private void FilterAndSort(SortType sort)
         {
-            List<Task> tasks = new List<Task>();
+            SetSort(sort);
 
-            if (_taskList != null)
+            lbTasks.Items.Filter = item =>
             {
-                if (string.IsNullOrEmpty(User.Default.FilterText))
+                var task = (Task)item;
+                bool include = true;
+                foreach (var filter in User.Default.FilterText.Split(new string[] { Environment.NewLine }, StringSplitOptions.RemoveEmptyEntries))
                 {
-                    tasks = _taskList.Tasks.ToList();
-                }
-                else
-                {
-                    foreach (var task in _taskList.Tasks)
-                    {
-                        bool include = true;
-                        foreach (var filter in User.Default.FilterText.Split(new string[] { Environment.NewLine }, StringSplitOptions.RemoveEmptyEntries))
+                    if (filter.Substring(0, 1) != "-")
+                    {   // if the filter does not start with a minus and filter is contained in task then filter out
+                        if (!task.Raw.Contains(filter))
+                            include = false;
+                    }
+                    else
+                    {   // if the filter starts with a minus then (ignoring the minus) check if the filter is contained in the task then filter out if so
+                        if (task.Raw.Contains(filter.Substring(1)))
                         {
-                            if (filter.Substring(0, 1) != "-")
-                            {   // if the filter does not start with a minus and filter is contained in task then filter out
-                                if (!task.Raw.Contains(filter))
-                                    include = false;
-                            }
-                            else
-                            {   // if the filter starts with a minus then (ignoring the minus) check if the filter is contained in the task then filter out if so
-                                if (task.Raw.Contains(filter.Substring(1)))
-                                {
-                                    include = false;
-                                }
-                            }
+                            include = false;
                         }
-
-                        if (include)
-                            tasks.Add(task);
                     }
                 }
-            }
 
-            SetSort(sort, tasks);
+                return include;
+            };
         }
 
         private void CheckForUpdates()
@@ -384,7 +367,7 @@ Copyright 2011 Ben Hughes";
 
             if (File.Exists(dialog.FileName))
                 LoadTasks(dialog.FileName);
-                
+
         }
 
         private static void SaveFileDialog(string filename)
@@ -392,7 +375,7 @@ Copyright 2011 Ben Hughes";
             using (StreamWriter todofile = new StreamWriter(filename))
             {
                 todofile.Write("");
-            }            
+            }
         }
 
 
@@ -781,7 +764,7 @@ Copyright 2011 Ben Hughes";
                         break;
                     default:
                         var word = FindIntelliWord();
-                        IntellisenseList.Items.Filter = (o) => o.ToString().Contains(word);
+                        IntellisenseList.Items.Filter = o => o.ToString().Contains(word);
 
                         break;
                 }
@@ -813,14 +796,14 @@ Copyright 2011 Ben Hughes";
                         List<string> projects = new List<string>();
                         _taskList.Tasks.Each(task => projects = projects.Concat(task.Projects).ToList());
 
-                        _intelliPos = taskText.CaretIndex-1;
+                        _intelliPos = taskText.CaretIndex - 1;
                         ShowIntellisense(projects.Distinct().OrderBy(s => s), taskText.GetRectFromCharacterIndex(_intelliPos));
                         break;
                     case Key.D2:
                         List<string> contexts = new List<string>();
                         _taskList.Tasks.Each(task => contexts = contexts.Concat(task.Contexts).ToList());
 
-                        _intelliPos = taskText.CaretIndex-1;
+                        _intelliPos = taskText.CaretIndex - 1;
                         ShowIntellisense(contexts.Distinct().OrderBy(s => s), taskText.GetRectFromCharacterIndex(_intelliPos));
                         break;
                 }
