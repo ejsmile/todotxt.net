@@ -4,14 +4,10 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
-using System.Text;
-using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Threading;
-using System.Xml;
 using Microsoft.Win32;
 using ToDoLib;
 
@@ -57,6 +53,7 @@ namespace Client
         HotKeyMainWindows _hotkey;
         ObserverChangeFile _changefile;
         CheckUpdate _checkupdate;
+        TaskPrint _print;
 
 		WindowLocation _previousWindowLocaiton;
 
@@ -74,14 +71,16 @@ namespace Client
 
                 //add view on change file
                 _changefile = new ObserverChangeFile();
-                _changefile.OnFileTaskListChange += () => Dispatcher.Invoke(DispatcherPriority.Normal, new Action(delegate() { this.Refresh(); }));
+                _changefile.OnFileTaskListChange += () => Dispatcher.Invoke(DispatcherPriority.Normal, new Action(delegate() { this.Reload(); }));
 
                 //CheckUpdate new version
                 _checkupdate = new CheckUpdate();
                 _checkupdate.OnCheckedUpdateVersion += (string version) => Dispatcher.BeginInvoke(new CheckUpdate.CheckUpdateVersion(this.ShowUpdateMenu), version);
                 _checkupdate.Check();
 
-				webBrowser1.Navigate("about:blank");
+                //preparation  for task Print
+                webBrowser1.Navigate("about:blank");
+                _print = new TaskPrint(webBrowser1);
 
 				// migrate the user settings from the previous version, if necessary
 				if (User.Default.FirstRun)
@@ -119,6 +118,7 @@ namespace Client
 			try
 			{
 				_taskList.ReloadTasks();
+                FilterAndSort(_currentSort);
 			}
 			catch (Exception ex)
 			{
@@ -170,7 +170,6 @@ namespace Client
 					break;
 				case Key.OemPeriod:
 					Reload();
-					FilterAndSort(_currentSort);
 					break;
 				case Key.X:
 					ToggleComplete((Task)lbTasks.SelectedItem);
@@ -546,10 +545,7 @@ namespace Client
 
 		private void btnPrint_Click(object sender, RoutedEventArgs e)
 		{
-			mshtml.IHTMLDocument2 doc = webBrowser1.Document as mshtml.IHTMLDocument2;
-			doc.execCommand("Print", true, 0);
-			doc.close();
-
+            _print.PrintDocTaskList();
 			Set_PrintControlsVisibility(false);
 		}
 
@@ -580,88 +576,17 @@ namespace Client
 			}
 		}
 
-		private string Get_PrintContents()
-		{
-			if (lbTasks.Items == null || lbTasks.Items.IsEmpty)
-				return "";
-
-
-			var contents = new StringBuilder();
-
-			contents.Append("<html><head>");
-			contents.Append("<title>todotxt.net</title>");
-			contents.Append("<style>" + Resource.CSS + "</style>");
-			contents.Append("</head>");
-
-			contents.Append("<body>");
-			contents.Append("<h2>todotxt.net</h2>");
-			contents.Append("<table>");
-			contents.Append("<tr class='tbhead'><th>&nbsp;</th><th>Done</th><th>Created</th><td>Details</td></tr>");
-
-			foreach (Task task in lbTasks.Items)
-			{
-				if (task.Completed)
-				{
-					contents.Append("<tr class='completedTask'>");
-					contents.Append("<td class='complete'>x</td> ");
-					contents.Append("<td class='completeddate'>" + task.CompletedDate + "</td> ");
-				}
-				else
-				{
-					contents.Append("<tr class='uncompletedTask'>");
-					if (string.IsNullOrEmpty(task.Priority))
-						contents.Append("<td>&nbsp;</td>");
-					else
-						contents.Append("<td><span class='priority'>" + task.Priority + "</span></td>");
-
-					contents.Append("<td>&nbsp;</td>");
-				}
-
-				if (string.IsNullOrEmpty(task.CreationDate))
-					contents.Append("<td>&nbsp;</td>");
-				else
-					contents.Append("<td class='startdate'>" + task.CreationDate + "</td>");
-
-				contents.Append("<td>" + task.Body);
-
-				task.Projects.ForEach(project => contents.Append(" <span class='project'>" + project + "</span> "));
-
-				task.Contexts.ForEach(context => contents.Append(" <span class='context'>" + context + "</span> "));
-
-				contents.Append("</td>");
-
-				contents.Append("</tr>");
-			}
-
-			contents.Append("</table></body></html>");
-
-			return contents.ToString();
-		}
-
 
 		private void File_PrintPreview(object sender, RoutedEventArgs e)
 		{
-			string printContents;
-			printContents = Get_PrintContents();
-
-			mshtml.IHTMLDocument2 doc = webBrowser1.Document as mshtml.IHTMLDocument2;
-			doc.clear();
-			doc.write(printContents);
-			doc.close();
-
+            _print.GenerateDocTaskList(lbTasks.Items);
 			Set_PrintControlsVisibility(true);
 		}
 
 		private void File_Print(object sender, RoutedEventArgs e)
 		{
-			string printContents;
-			printContents = Get_PrintContents();
-
-			mshtml.IHTMLDocument2 doc = webBrowser1.Document as mshtml.IHTMLDocument2;
-			doc.clear();
-			doc.write(printContents);
-			doc.execCommand("Print", true, 0);
-			doc.close();
+            _print.GenerateDocTaskList(lbTasks.Items);
+            _print.PrintDocTaskList();
 		}
 
 		#endregion  //printing
@@ -739,20 +664,17 @@ namespace Client
 						updated.IncPriority();
 						_taskList.Update(selected, updated);
 						Reload();
-						FilterAndSort(_currentSort);
 						break;
 
 					case Key.Down:
 						updated.DecPriority();
 						_taskList.Update(selected, updated);
-						FilterAndSort(_currentSort);
 						Reload();
 						break;
 					case Key.Left:
 					case Key.Right:
 						updated.SetPriority(' ');
 						_taskList.Update(selected, updated);
-						FilterAndSort(_currentSort);
 						Reload();
 						break;
 				}
@@ -943,14 +865,6 @@ namespace Client
 		#endregion
 
 		#endregion
-        
-        #region Refresh Task
-        private void Refresh()
-        {
-            Reload();
-            FilterAndSort(_currentSort);
-        }
-        #endregion
     }
 }
 

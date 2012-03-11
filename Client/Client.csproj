@@ -79,7 +79,6 @@
       <SubType>Designer</SubType>
     </ApplicationDefinition>
     <Compile Include="CheckUpdate.cs" />
-    <Compile Include="CheckUpdateVersion.cs" />
     <Compile Include="FilterDialog.xaml.cs">
       <DependentUpon>FilterDialog.xaml</DependentUpon>
     </Compile>
@@ -95,6 +94,7 @@
       <DesignTime>True</DesignTime>
       <DependentUpon>Resource.resx</DependentUpon>
     </Compile>
+    <Compile Include="TaskPrint.cs" />
     <Compile Include="TrayMainWindows.cs" />
     <Compile Include="User.cs" />
     <Compile Include="User.Designer.cs">
